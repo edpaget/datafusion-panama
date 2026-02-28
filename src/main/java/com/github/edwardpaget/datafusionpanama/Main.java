@@ -12,13 +12,18 @@ public class Main {
     public static void main(String[] args) throws Throwable {
         var libPath = System.getProperty("java.library.path");
         try (var arena = Arena.ofConfined()) {
-            SymbolLookup lookup = SymbolLookup.libraryLookup(
-                    Path.of(libPath, System.mapLibraryName("datafusion_panama")), arena);
+            SymbolLookup lookup =
+                    SymbolLookup.libraryLookup(
+                            Path.of(libPath, System.mapLibraryName("datafusion_panama")), arena);
 
             Linker linker = Linker.nativeLinker();
-            MethodHandle add = linker.downcallHandle(
-                    lookup.find("add").orElseThrow(),
-                    FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+            MethodHandle add =
+                    linker.downcallHandle(
+                            lookup.find("add").orElseThrow(),
+                            FunctionDescriptor.of(
+                                    ValueLayout.JAVA_INT,
+                                    ValueLayout.JAVA_INT,
+                                    ValueLayout.JAVA_INT));
 
             int result = (int) add.invokeExact(3, 4);
             System.out.println("3 + 4 = " + result);

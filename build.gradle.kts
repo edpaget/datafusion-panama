@@ -1,7 +1,12 @@
+import net.ltgt.gradle.errorprone.errorprone
+
 plugins {
     java
     application
     checkstyle
+    jacoco
+    id("net.ltgt.errorprone") version "5.0.0"
+    id("com.diffplug.spotless") version "8.2.1"
 }
 
 repositories {
@@ -19,6 +24,19 @@ checkstyle {
     configFile = file("config/checkstyle/checkstyle.xml")
 }
 
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+spotless {
+    java {
+        googleJavaFormat().aosp()
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
 val installGitHook by tasks.registering(Copy::class) {
     description = "Install the pre-commit git hook"
     from("hooks/pre-commit")
@@ -34,6 +52,9 @@ tasks.named("check") {
 
 tasks.withType<JavaCompile> {
     options.compilerArgs.addAll(listOf("--enable-preview"))
+    options.errorprone {
+        disableWarningsInGeneratedCode.set(true)
+    }
 }
 
 tasks.withType<JavaExec> {
@@ -43,6 +64,14 @@ tasks.withType<JavaExec> {
 tasks.withType<Test> {
     jvmArgs("--enable-preview", "--enable-native-access=ALL-UNNAMED")
     useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    reports {
+        html.required.set(true)
+        xml.required.set(true)
+    }
 }
 
 // --- Rust native library build ---
@@ -90,6 +119,7 @@ application {
 }
 
 dependencies {
+    errorprone("com.google.errorprone:error_prone_core:2.48.0")
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
