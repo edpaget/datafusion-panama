@@ -9,3 +9,6 @@ name = "datafusion_panama"
 crate-type = ["cdylib"]
 
 [dependencies]
+datafusion = "52"
+tokio = { version = "1", features = ["rt-multi-thread"] }
+arrow = "57"
