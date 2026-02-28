@@ -38,6 +38,11 @@ cd rust && cargo test
 - `src/main/java/` — Java code using Panama's `Linker` and `SymbolLookup` to call into Rust
 - `build.gradle.kts` — Orchestrates both Java and Rust builds
 
+## Development practices
+
+- **Test-Driven Development (TDD):** Write tests before implementation. Red-green-refactor: write a failing test that defines the desired behavior, implement the minimum code to make it pass, then refactor.
+- **Loose coupling via interfaces:** Modules should depend on interfaces (Java interfaces or abstract types), not on concrete implementations. This applies across the Java layer boundaries — the idiomatic API layer, the raw Panama bindings, and the Arrow data consumption layer should be connected through contracts, not direct references to implementation classes.
+
 ## Commit conventions
 
 Use [Conventional Commits](https://www.conventionalcommits.org/). Format:

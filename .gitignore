@@ -13,3 +13,6 @@ build/
 
 # OS
 .DS_Store
+
+# Local roadmaps (working docs, not committed)
+roadmaps/
