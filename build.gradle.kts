@@ -1,6 +1,7 @@
 plugins {
     java
     application
+    checkstyle
 }
 
 repositories {
@@ -11,6 +12,24 @@ java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(22)
     }
+}
+
+checkstyle {
+    toolVersion = "10.21.4"
+    configFile = file("config/checkstyle/checkstyle.xml")
+}
+
+val installGitHook by tasks.registering(Copy::class) {
+    description = "Install the pre-commit git hook"
+    from("hooks/pre-commit")
+    into(".git/hooks")
+    filePermissions {
+        unix("rwxr-xr-x")
+    }
+}
+
+tasks.named("check") {
+    dependsOn(installGitHook)
 }
 
 tasks.withType<JavaCompile> {

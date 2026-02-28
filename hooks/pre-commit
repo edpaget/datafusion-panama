@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "=== Running pre-commit checks ==="
+
+echo "--- Java: Checkstyle ---"
+./gradlew checkstyleMain checkstyleTest --quiet
+echo "Checkstyle passed."
+
+echo "--- Rust: cargo fmt --check ---"
+(cd rust && cargo fmt --check)
+echo "Rust formatting passed."
+
+echo "--- Rust: cargo clippy ---"
+(cd rust && cargo clippy -- -D warnings)
+echo "Clippy passed."
+
+echo "=== All pre-commit checks passed ==="
