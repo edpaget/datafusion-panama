@@ -205,6 +205,51 @@ Panama `MethodHandle` declarations are written by hand in Java. The FFI surface 
 
 **Phase 3: Async + streaming.** Add `sqlAsync()` returning `CompletableFuture`, streaming result sets via `ArrowArrayStream` (batch-at-a-time rather than collecting all at once).
 
+**Phase 4: Minimal JDBC adapter.** A thin JDBC driver that wraps the DataFusion session, enabling any JDBC-compatible tool (DBeaver, DataGrip, BI tools, JDBC-based ORMs) to query DataFusion.
+
+Scope — implement the minimum subset of JDBC interfaces needed for read-only SQL:
+
+| Interface | Key methods | Notes |
+|-----------|------------|-------|
+| `java.sql.Driver` | `connect`, `acceptsURL` | URL scheme: `jdbc:datafusion:` with path to data dir or `:memory:` |
+| `Connection` | `createStatement`, `prepareStatement`, `getMetaData`, `close` | Wraps `DataFusionSession`. Read-only; `setAutoCommit`/`commit`/`rollback` are no-ops. |
+| `Statement` | `executeQuery`, `execute`, `getResultSet`, `close` | Delegates to `session.sql()` |
+| `PreparedStatement` | `setString`, `setInt`, `setLong`, `setDouble`, `executeQuery` | Parameter substitution via string interpolation initially; parameterized queries later if DataFusion adds support. |
+| `ResultSet` | `next`, `getString`, `getInt`, `getLong`, `getDouble`, `getFloat`, `getBoolean`, `wasNull`, `getMetaData`, `close` | Backed by the Arrow `RecordBatchReader` from Phase 1. Iterates row-by-row across batches. |
+| `ResultSetMetaData` | `getColumnCount`, `getColumnName`, `getColumnType`, `getColumnTypeName` | Maps Arrow schema fields to `java.sql.Types` |
+| `DatabaseMetaData` | `getTables`, `getColumns`, `getSchemas`, `getCatalogs`, `getTypeInfo` | Queries DataFusion's `information_schema`. Enables tool auto-discovery of tables/columns. |
+
+Design decisions:
+- **Service-provider registration:** `META-INF/services/java.sql.Driver` so `DriverManager.getConnection()` works automatically.
+- **Arrow-to-JDBC type mapping:** `Int8`→`TINYINT`, `Int16`→`SMALLINT`, `Int32`→`INTEGER`, `Int64`→`BIGINT`, `Float32`→`REAL`, `Float64`→`DOUBLE`, `Utf8`→`VARCHAR`, `Boolean`→`BOOLEAN`, `Date32`→`DATE`, `Timestamp`→`TIMESTAMP`. Unmapped types fall back to `getString()`.
+- **Row cursor over batches:** `ResultSet` internally holds a `RecordBatchReader` and tracks current batch + row index. `next()` advances within the current batch, fetching the next batch when exhausted.
+- **Read-only:** `executeUpdate` throws `SQLFeatureNotSupportedException`. Transaction methods are no-ops. `ResultSet` is `TYPE_FORWARD_ONLY`, `CONCUR_READ_ONLY`.
+- **Unsupported methods:** Throw `SQLFeatureNotSupportedException` with a descriptive message. This is standard practice for minimal JDBC drivers.
+
+Connection URL format:
+```
+jdbc:datafusion:/path/to/data       # file-backed, registers directory as tables
+jdbc:datafusion::memory:            # in-memory session
+jdbc:datafusion:?key=value          # with configuration properties
+```
+
+Sketch of usage:
+```java
+try (var conn = DriverManager.getConnection("jdbc:datafusion::memory:")) {
+    try (var stmt = conn.createStatement()) {
+        stmt.execute("CREATE EXTERNAL TABLE t STORED AS CSV LOCATION 'data.csv'");
+    }
+    try (var stmt = conn.createStatement();
+         var rs = stmt.executeQuery("SELECT * FROM t WHERE x > 10")) {
+        while (rs.next()) {
+            System.out.println(rs.getString("name") + ": " + rs.getInt("x"));
+        }
+    }
+}
+```
+
+This phase depends only on Phase 1 (core query path) — it wraps the existing session and result-reading infrastructure behind standard JDBC interfaces. No new Rust FFI functions are needed.
+
 ## Dependencies
 
 ### Rust side
