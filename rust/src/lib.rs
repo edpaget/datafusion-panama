@@ -3,6 +3,9 @@ use std::ffi::c_int;
 mod result;
 pub use result::*;
 
+mod runtime;
+pub use runtime::*;
+
 /// Example function exported via C FFI for use with Java's Foreign Function & Memory API.
 #[unsafe(no_mangle)]
 pub extern "C" fn add(a: c_int, b: c_int) -> c_int {

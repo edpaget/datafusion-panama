@@ -62,7 +62,9 @@ tasks.withType<JavaExec> {
 }
 
 tasks.withType<Test> {
+    dependsOn("copyNativeLib")
     jvmArgs("--enable-preview", "--enable-native-access=ALL-UNNAMED")
+    systemProperty("java.library.path", layout.buildDirectory.dir("native").get().asFile.absolutePath)
     useJUnitPlatform()
     finalizedBy(tasks.jacocoTestReport)
 }
