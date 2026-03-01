@@ -17,6 +17,10 @@ public class Main {
 
         try (DataFusionRuntime runtime = DataFusionRuntime.create()) {
             System.out.println("Runtime created: " + runtime.nativePointer());
+            try (DataFusionSession session = runtime.newSession()) {
+                System.out.println("Session created: " + session.nativePointer());
+            }
+            System.out.println("Session closed successfully.");
         }
         System.out.println("Runtime closed successfully.");
     }

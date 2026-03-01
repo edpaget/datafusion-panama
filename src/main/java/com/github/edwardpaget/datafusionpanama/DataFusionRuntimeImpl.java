@@ -33,6 +33,11 @@ final class DataFusionRuntimeImpl implements DataFusionRuntime {
     }
 
     @Override
+    public DataFusionSession newSession() throws DataFusionException {
+        return DataFusionSessionImpl.create(nativePointer());
+    }
+
+    @Override
     public MemorySegment nativePointer() {
         if (pointer == null || pointer.equals(MemorySegment.NULL)) {
             throw new IllegalStateException("runtime is closed");

@@ -10,6 +10,9 @@ public interface DataFusionRuntime extends AutoCloseable {
         return DataFusionRuntimeImpl.create();
     }
 
+    /** Creates a new DataFusion session context backed by this runtime. */
+    DataFusionSession newSession() throws DataFusionException;
+
     /**
      * Returns the native pointer for use by other FFI classes.
      *

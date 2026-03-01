@@ -3,7 +3,7 @@ use std::ffi::c_void;
 use crate::result::{ffi_result, DFResult};
 
 pub struct DFRuntime {
-    #[allow(dead_code)] // Used by session FFI in a later step
+    #[allow(dead_code)] // Accessed via raw pointer in session_new; Clippy can't see unsafe deref
     pub(crate) runtime: tokio::runtime::Runtime,
 }
 
