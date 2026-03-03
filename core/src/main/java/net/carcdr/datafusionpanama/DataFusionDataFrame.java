@@ -6,6 +6,13 @@ import java.lang.foreign.MemorySegment;
 public interface DataFusionDataFrame extends AutoCloseable {
 
     /**
+     * Collects this DataFrame into Arrow record batches and returns a reader to iterate them.
+     *
+     * @throws DataFusionException if collection fails
+     */
+    RecordBatchReader collect() throws DataFusionException;
+
+    /**
      * Returns the native pointer for use by other FFI classes.
      *
      * @throws IllegalStateException if the DataFrame has been closed

@@ -52,7 +52,7 @@ final class DataFusionSessionImpl implements DataFusionSession {
                     (MemorySegment)
                             SESSION_SQL.invokeExact(runtimePointer, nativePointer(), sqlSegment);
             MemorySegment dataframePtr = NativeLibrary.unwrapOrThrow(resultPtr);
-            return new DataFusionDataFrameImpl(dataframePtr);
+            return new DataFusionDataFrameImpl(dataframePtr, runtimePointer);
         } catch (DataFusionException e) {
             throw e;
         } catch (Throwable t) {

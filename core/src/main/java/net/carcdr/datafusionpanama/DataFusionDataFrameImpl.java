@@ -12,10 +12,17 @@ final class DataFusionDataFrameImpl implements DataFusionDataFrame {
             NativeLibrary.downcallHandle(
                     "dataframe_free", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
 
+    private final MemorySegment runtimePointer;
     private MemorySegment pointer;
 
-    DataFusionDataFrameImpl(MemorySegment pointer) {
+    DataFusionDataFrameImpl(MemorySegment pointer, MemorySegment runtimePointer) {
         this.pointer = pointer;
+        this.runtimePointer = runtimePointer;
+    }
+
+    @Override
+    public RecordBatchReader collect() throws DataFusionException {
+        return RecordBatchReaderImpl.create(runtimePointer, nativePointer());
     }
 
     @Override
