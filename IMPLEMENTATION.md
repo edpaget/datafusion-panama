@@ -10,19 +10,19 @@ This mirrors datafusion-python's architecture (PyO3 for control, Arrow C Data In
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  Java API Layer (hand-written, idiomatic)        │
-│  DataFusionRuntime / DataFusionSession / ...     │
+│  Java API Layer                                  │
+│  core/   — DataFusionRuntime / Session / ...     │
+│  ext-*/* — Extension modules (optional JARs)     │
 ├─────────────────────────────────────────────────┤
 │  Raw Panama Bindings (hand-written MethodHandles) │
-│  MethodHandles for each extern "C" function      │
+│  Core symbols always present; extension symbols   │
+│  present only when Rust feature is enabled        │
 ├──────────────────────┬──────────────────────────┤
 │  Control Plane       │  Data Plane              │
 │  Panama downcalls    │  Arrow C Data Interface  │
-│  (session, config,   │  (ArrowArrayStream for   │
-│   UDF registration,  │   zero-copy result       │
-│   query dispatch)    │   transfer)              │
 ├──────────────────────┴──────────────────────────┤
 │  Rust cdylib (extern "C" surface)               │
+│  Core modules + feature-gated extension modules  │
 │  Tokio runtime, DataFusion SessionContext        │
 └─────────────────────────────────────────────────┘
 ```
@@ -85,6 +85,7 @@ Rough grouping of FFI functions:
 | Session  | `session_new`, `session_free`, `session_sql`, `session_register_csv`, `session_register_parquet` |
 | DataFrame | `dataframe_collect`, `dataframe_free` |
 | Result   | `result_is_ok`, `result_unwrap`, `result_error_message`, `result_free` |
+| Extensions | `enabled_features`; per-extension registration functions (feature-gated) |
 
 ### Error Handling: Opaque Result Handle
 
@@ -123,6 +124,62 @@ private static MemorySegment unwrapOrThrow(MemorySegment result) throws DataFusi
 ```
 
 This keeps function signatures clean, centralizes error handling on both sides, and is extensible — adding error codes or categories later means adding new inspector functions without changing any existing signatures.
+
+## Extension Architecture
+
+Extensions are purely additive. They add FFI symbols and register providers (catalogs, table factories, optimizer rules) into the existing `SessionContext`. Core types (`DFResult`, `DFRuntime`, `DFSession`, `DFDataFrame`) are never modified by extensions.
+
+### Rust side — Cargo features
+
+Each extension is a Cargo feature flag that gates an optional dependency and a `mod` declaration. Feature-gated modules live in `rust/src/` alongside core modules (or in subdirectories for extensions with multiple sub-features).
+
+Extension FFI functions take `*mut DFRuntime` and `*mut DFSession` as their first arguments and register catalogs/providers/rules into the session's `SessionContext`. They follow the same `-> *mut DFResult` + `ffi_result!` pattern as core.
+
+`Cargo.toml` feature pattern:
+
+```toml
+[features]
+default = []
+ext-foo = ["dep:some-crate"]
+ext-bar = ["dep:another-crate"]
+all-extensions = ["ext-foo", "ext-bar"]
+
+[dependencies]
+some-crate = { version = "...", optional = true }
+another-crate = { version = "...", optional = true }
+```
+
+`lib.rs` conditional compilation pattern:
+
+```rust
+#[cfg(feature = "ext-foo")]
+mod foo;
+#[cfg(feature = "ext-foo")]
+pub use foo::*;
+```
+
+### Java side — Gradle subprojects
+
+Each extension is a separate Gradle subproject (e.g., `ext-foo/`) that depends on `:core`. Extension modules provide their own `MethodHandle` lookups via `NativeLibrary.LOOKUP` and their own Java API types (following the same public-interface + package-private-impl pattern as core).
+
+Extensions use `NativeLibrary.LOOKUP.find(name)` which returns `Optional<MemorySegment>`. If the symbol is absent (Rust built without that feature), the lookup returns empty. Extension modules check this at load time and throw `UnsupportedOperationException` with a message naming the missing Cargo feature.
+
+Users add only the Gradle dependencies they need:
+
+```kotlin
+dependencies {
+    implementation(project(":core"))
+    implementation(project(":ext-foo"))  // optional
+}
+```
+
+### Feature manifest
+
+A core FFI function `enabled_features() -> *const c_char` returns a comma-separated list of features compiled into the native library. Java's `NativeLibrary` exposes this as `NativeLibrary.enabledFeatures() -> Set<String>`. Extensions can check this at load time for clear diagnostics.
+
+### Naming convention
+
+Cargo features and Gradle subprojects use the `ext-` prefix for third-party DataFusion ecosystem integrations (e.g., `ext-iceberg`, `ext-delta`, `ext-federation`). This distinguishes them from core modules (`core`, `jdbc`).
 
 ## Async Bridging
 
@@ -197,6 +254,20 @@ Panama `MethodHandle` declarations are written by hand in Java. The FFI surface 
 
 `cbindgen` generates a C header from the Rust source as a **CI verification step** — not part of the main build. This catches drift between the Rust FFI surface and Java declarations. Any mismatch also shows up as runtime link errors in tests, providing a second safety net.
 
+### Cargo feature selection
+
+The Gradle `buildRust` task accepts a `rustFeatures` project property that maps to `cargo build --features`:
+
+```sh
+./gradlew build -PrustFeatures=ext-iceberg,ext-delta
+```
+
+Default (no property): builds core only, smallest binary. An `all-extensions` feature is provided for convenience:
+
+```sh
+./gradlew build -PrustFeatures=all-extensions
+```
+
 ## Implementation Phases
 
 **Phase 1: Core query path.** Runtime and session lifecycle, `session.sql()` returning results via Arrow C Data Interface, CSV/Parquet table registration. Synchronous only. This validates the entire architecture end-to-end.
@@ -250,14 +321,16 @@ try (var conn = DriverManager.getConnection("jdbc:datafusion::memory:")) {
 
 This phase depends only on Phase 1 (core query path) — it wraps the existing session and result-reading infrastructure behind standard JDBC interfaces. No new Rust FFI functions are needed.
 
+**Phase 5: Extension architecture.** Implement the extension infrastructure: `enabled_features` FFI function, `NativeLibrary.enabledFeatures()` on the Java side, Gradle `rustFeatures` property, and one example extension module as a proving ground for the pattern. This validates the feature-gating, symbol probing, and build coordination before building real extensions.
+
 ## Dependencies
 
 ### Rust side
-- `datafusion` — the query engine
-- `tokio` — async runtime (pulled in by datafusion)
-- `arrow` — Arrow memory/types (pulled in by datafusion)
+- Core: `datafusion`, `tokio`, `arrow` (unchanged)
+- Extensions: each declared as `optional = true` in `[dependencies]`, gated by its feature flag
 
 ### Java side
-- No external dependencies for core functionality (pure Panama APIs)
+- Core: no external dependencies (pure Panama APIs)
+- Extension modules: no external Java dependencies — they only add Panama bindings for the feature-gated FFI symbols. The heavy lifting is in Rust.
 - Apache Arrow Java — optional bridge module, deferred to a later phase
 - JUnit 5 (test only, already present)
