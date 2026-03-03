@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "22"
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Rust format check
+        working-directory: rust
+        run: cargo fmt --check
+
+      - name: Rust clippy
+        working-directory: rust
+        run: cargo clippy -- -D warnings
+
+      - name: Build and test
+        run: ./gradlew check

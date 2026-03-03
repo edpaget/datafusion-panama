@@ -5,9 +5,13 @@ plugins {
     application
     checkstyle
     jacoco
+    `maven-publish`
     id("net.ltgt.errorprone") version "5.0.0"
     id("com.diffplug.spotless") version "8.2.1"
 }
+
+group = "net.carcdr"
+version = "0.1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
@@ -17,6 +21,7 @@ java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(22)
     }
+    withSourcesJar()
 }
 
 checkstyle {
@@ -118,6 +123,24 @@ tasks.named<JavaExec>("run") {
 
 application {
     mainClass = "com.github.edwardpaget.datafusionpanama.Main"
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+        }
+    }
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/edpaget/datafusion-panama")
+            credentials {
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
 }
 
 dependencies {
