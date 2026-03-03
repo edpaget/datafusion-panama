@@ -74,6 +74,7 @@ subprojects {
             languageVersion = JavaLanguageVersion.of(22)
         }
         withSourcesJar()
+        withJavadocJar()
     }
 
     configure<CheckstyleExtension> {
@@ -92,6 +93,16 @@ subprojects {
             trimTrailingWhitespace()
             endWithNewline()
         }
+    }
+
+    tasks.withType<Javadoc> {
+        val opts = options as StandardJavadocDocletOptions
+        opts.addBooleanOption("-enable-preview", true)
+        opts.addStringOption("source", "22")
+    }
+
+    tasks.named("check") {
+        dependsOn(tasks.named("javadoc"))
     }
 
     tasks.withType<JavaCompile> {

@@ -3,9 +3,9 @@ set -euo pipefail
 
 echo "=== Running pre-commit checks ==="
 
-echo "--- Java: Spotless + Checkstyle ---"
-./gradlew spotlessCheck checkstyleMain checkstyleTest --quiet
-echo "Spotless + Checkstyle passed."
+echo "--- Java: Spotless + Checkstyle + Javadoc ---"
+./gradlew spotlessCheck checkstyleMain checkstyleTest javadoc --quiet
+echo "Spotless + Checkstyle + Javadoc passed."
 
 echo "--- Rust: cargo fmt --check ---"
 (cd rust && cargo fmt --check)
