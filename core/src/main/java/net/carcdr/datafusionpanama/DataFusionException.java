@@ -1,4 +1,4 @@
-package com.github.edwardpaget.datafusionpanama;
+package net.carcdr.datafusionpanama;
 
 /** Checked exception thrown when a DataFusion FFI call returns an error. */
 public class DataFusionException extends Exception {

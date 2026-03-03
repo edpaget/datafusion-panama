@@ -1,4 +1,4 @@
-package com.github.edwardpaget.datafusionpanama;
+package net.carcdr.datafusionpanama;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;

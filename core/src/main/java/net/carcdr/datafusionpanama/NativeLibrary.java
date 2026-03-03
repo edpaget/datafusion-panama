@@ -1,4 +1,4 @@
-package com.github.edwardpaget.datafusionpanama;
+package net.carcdr.datafusionpanama;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;

@@ -3,7 +3,7 @@ plugins {
 }
 
 application {
-    mainClass = "com.github.edwardpaget.datafusionpanama.Main"
+    mainClass = "net.carcdr.datafusionpanama.Main"
 }
 
 tasks.named<JavaExec>("run") {
