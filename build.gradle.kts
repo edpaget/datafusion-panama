@@ -1,46 +1,12 @@
 import net.ltgt.gradle.errorprone.errorprone
 
 plugins {
-    java
-    application
-    checkstyle
-    jacoco
-    `maven-publish`
-    id("net.ltgt.errorprone") version "5.0.0"
-    id("com.diffplug.spotless") version "8.2.1"
+    base
+    id("net.ltgt.errorprone") version "5.0.0" apply false
+    id("com.diffplug.spotless") version "8.2.1" apply false
 }
 
-group = "net.carcdr"
-version = "0.1.0-SNAPSHOT"
-
-repositories {
-    mavenCentral()
-}
-
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(22)
-    }
-    withSourcesJar()
-}
-
-checkstyle {
-    toolVersion = "10.21.4"
-    configFile = file("config/checkstyle/checkstyle.xml")
-}
-
-jacoco {
-    toolVersion = "0.8.12"
-}
-
-spotless {
-    java {
-        googleJavaFormat().aosp()
-        removeUnusedImports()
-        trimTrailingWhitespace()
-        endWithNewline()
-    }
-}
+// --- Git hook ---
 
 val installGitHook by tasks.registering(Copy::class) {
     description = "Install the pre-commit git hook"
@@ -53,32 +19,6 @@ val installGitHook by tasks.registering(Copy::class) {
 
 tasks.named("check") {
     dependsOn(installGitHook)
-}
-
-tasks.withType<JavaCompile> {
-    options.compilerArgs.addAll(listOf("--enable-preview"))
-    options.errorprone {
-        disableWarningsInGeneratedCode.set(true)
-    }
-}
-
-tasks.withType<JavaExec> {
-    jvmArgs("--enable-preview", "--enable-native-access=ALL-UNNAMED")
-}
-
-tasks.withType<Test> {
-    dependsOn("copyNativeLib")
-    jvmArgs("--enable-preview", "--enable-native-access=ALL-UNNAMED")
-    systemProperty("java.library.path", layout.buildDirectory.dir("native").get().asFile.absolutePath)
-    useJUnitPlatform()
-    finalizedBy(tasks.jacocoTestReport)
-}
-
-tasks.jacocoTestReport {
-    reports {
-        html.required.set(true)
-        xml.required.set(true)
-    }
 }
 
 // --- Rust native library build ---
@@ -106,45 +46,104 @@ val libFileName = when {
 }
 
 val copyNativeLib by tasks.registering(Copy::class) {
-    description = "Copy the Rust native library to the resources directory"
+    description = "Copy the Rust native library to the build directory"
     dependsOn(buildRust)
     from(rustTargetDir.dir("release").file(libFileName))
     into(layout.buildDirectory.dir("native"))
 }
 
-tasks.named("processResources") {
-    dependsOn(copyNativeLib)
-}
+// --- Shared subproject configuration ---
 
-tasks.named<JavaExec>("run") {
-    dependsOn(copyNativeLib)
-    systemProperty("java.library.path", layout.buildDirectory.dir("native").get().asFile.absolutePath)
-}
+subprojects {
+    apply(plugin = "java-library")
+    apply(plugin = "checkstyle")
+    apply(plugin = "jacoco")
+    apply(plugin = "maven-publish")
+    apply(plugin = "net.ltgt.errorprone")
+    apply(plugin = "com.diffplug.spotless")
 
-application {
-    mainClass = "com.github.edwardpaget.datafusionpanama.Main"
-}
+    group = "net.carcdr"
+    version = "0.1.0-SNAPSHOT"
 
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
+    repositories {
+        mavenCentral()
+    }
+
+    configure<JavaPluginExtension> {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(22)
+        }
+        withSourcesJar()
+    }
+
+    configure<CheckstyleExtension> {
+        toolVersion = "10.21.4"
+        configFile = rootProject.file("config/checkstyle/checkstyle.xml")
+    }
+
+    configure<JacocoPluginExtension> {
+        toolVersion = "0.8.12"
+    }
+
+    configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+        java {
+            googleJavaFormat().aosp()
+            removeUnusedImports()
+            trimTrailingWhitespace()
+            endWithNewline()
         }
     }
-    repositories {
-        maven {
-            name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/edpaget/datafusion-panama")
-            credentials {
-                username = System.getenv("GITHUB_ACTOR")
-                password = System.getenv("GITHUB_TOKEN")
+
+    tasks.withType<JavaCompile> {
+        options.compilerArgs.addAll(listOf("--enable-preview"))
+        options.errorprone {
+            disableWarningsInGeneratedCode.set(true)
+        }
+    }
+
+    tasks.withType<JavaExec> {
+        jvmArgs("--enable-preview", "--enable-native-access=ALL-UNNAMED")
+    }
+
+    tasks.withType<Test> {
+        dependsOn(rootProject.tasks.named("copyNativeLib"))
+        jvmArgs("--enable-preview", "--enable-native-access=ALL-UNNAMED")
+        systemProperty(
+            "java.library.path",
+            rootProject.layout.buildDirectory.dir("native").get().asFile.absolutePath
+        )
+        useJUnitPlatform()
+        finalizedBy(tasks.named("jacocoTestReport"))
+    }
+
+    tasks.withType<JacocoReport> {
+        reports {
+            html.required.set(true)
+            xml.required.set(true)
+        }
+    }
+
+    configure<PublishingExtension> {
+        publications {
+            create<MavenPublication>("maven") {
+                from(components["java"])
+            }
+        }
+        repositories {
+            maven {
+                name = "GitHubPackages"
+                url = uri("https://maven.pkg.github.com/edpaget/datafusion-panama")
+                credentials {
+                    username = System.getenv("GITHUB_ACTOR")
+                    password = System.getenv("GITHUB_TOKEN")
+                }
             }
         }
     }
-}
 
-dependencies {
-    errorprone("com.google.errorprone:error_prone_core:2.48.0")
-    testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    dependencies {
+        "errorprone"("com.google.errorprone:error_prone_core:2.48.0")
+        "testImplementation"("org.junit.jupiter:junit-jupiter:5.11.4")
+        "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
+    }
 }
