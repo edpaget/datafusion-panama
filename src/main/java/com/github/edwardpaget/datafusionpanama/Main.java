@@ -19,6 +19,10 @@ public class Main {
             System.out.println("Runtime created: " + runtime.nativePointer());
             try (DataFusionSession session = runtime.newSession()) {
                 System.out.println("Session created: " + session.nativePointer());
+                try (DataFusionDataFrame df = session.sql("SELECT 1 + 1 AS result")) {
+                    System.out.println("DataFrame created: " + df.nativePointer());
+                }
+                System.out.println("DataFrame closed successfully.");
             }
             System.out.println("Session closed successfully.");
         }
