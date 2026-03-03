@@ -99,6 +99,7 @@ subprojects {
         val opts = options as StandardJavadocDocletOptions
         opts.addBooleanOption("-enable-preview", true)
         opts.addStringOption("source", "22")
+        opts.addBooleanOption("Werror", true)
     }
 
     tasks.named("check") {

@@ -4,7 +4,17 @@ import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 
+/** Smoke-test entry point that exercises the FFI bindings. */
 public class Main {
+
+    private Main() {}
+
+    /**
+     * Runs a simple DataFusion round-trip through the Panama FFI layer.
+     *
+     * @param args command-line arguments (unused)
+     * @throws Throwable if any FFI call fails
+     */
     public static void main(String[] args) throws Throwable {
         MethodHandle add =
                 NativeLibrary.downcallHandle(

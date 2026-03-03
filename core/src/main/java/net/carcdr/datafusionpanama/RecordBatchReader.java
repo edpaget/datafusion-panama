@@ -25,6 +25,8 @@ public interface RecordBatchReader extends AutoCloseable {
      * Returns the schema of the stream as a raw {@code ArrowSchema} memory segment.
      *
      * <p>The segment is valid for the lifetime of this reader.
+     *
+     * @return a memory segment pointing to the {@code ArrowSchema} struct
      */
     MemorySegment getSchema();
 
@@ -33,6 +35,8 @@ public interface RecordBatchReader extends AutoCloseable {
      *
      * <p>Only valid after {@link #next()} has returned {@code true}. The segment is valid until the
      * next call to {@link #next()} or {@link #close()}.
+     *
+     * @return a memory segment pointing to the {@code ArrowArray} struct
      */
     MemorySegment getCurrentBatch();
 
