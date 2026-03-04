@@ -3,31 +3,21 @@ package net.carcdr.datafusionpanama;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.arrow.vector.BigIntVector;
 import org.junit.jupiter.api.Test;
 
 class RecordBatchReaderTest {
 
     @Test
-    void collectReturnsNonNullReader() throws DataFusionException {
+    void collectSchemaHasExpectedField() throws DataFusionException {
         try (DataFusionRuntime runtime = DataFusionRuntime.create();
                 DataFusionSession session = runtime.newSession();
                 DataFusionDataFrame df = session.sql("SELECT 1 AS a");
                 RecordBatchReader reader = df.collect()) {
-            assertNotNull(reader);
-        }
-    }
-
-    @Test
-    void collectSchemaIsNonNull() throws DataFusionException {
-        try (DataFusionRuntime runtime = DataFusionRuntime.create();
-                DataFusionSession session = runtime.newSession();
-                DataFusionDataFrame df = session.sql("SELECT 1 AS a");
-                RecordBatchReader reader = df.collect()) {
-            assertNotNull(reader.getSchema());
             assertEquals(1, reader.getSchema().getFields().size());
+            assertEquals("a", reader.getSchema().getFields().get(0).getName());
         }
     }
 
@@ -43,14 +33,16 @@ class RecordBatchReaderTest {
     }
 
     @Test
-    void collectCurrentBatchIsNonNull() throws DataFusionException {
+    void collectCurrentBatchContainsExpectedValue() throws DataFusionException {
         try (DataFusionRuntime runtime = DataFusionRuntime.create();
                 DataFusionSession session = runtime.newSession();
                 DataFusionDataFrame df = session.sql("SELECT 1 AS a");
                 RecordBatchReader reader = df.collect()) {
             assertTrue(reader.next());
-            assertNotNull(reader.getCurrentBatch());
-            assertEquals(1, reader.getCurrentBatch().getRowCount());
+            var batch = reader.getCurrentBatch();
+            assertEquals(1, batch.getRowCount());
+            BigIntVector vec = (BigIntVector) batch.getVector("a");
+            assertEquals(1L, vec.get(0));
         }
     }
 
@@ -71,14 +63,15 @@ class RecordBatchReaderTest {
                 DataFusionSession session = runtime.newSession();
                 DataFusionDataFrame df = session.sql("SELECT 1 AS a, 2 AS b");
                 RecordBatchReader reader = df.collect()) {
-            assertNotNull(reader.getSchema());
             assertEquals(2, reader.getSchema().getFields().size());
-            int batchCount = 0;
-            while (reader.next()) {
-                assertNotNull(reader.getCurrentBatch());
-                batchCount++;
-            }
-            assertTrue(batchCount > 0, "should have at least one batch");
+            assertTrue(reader.next());
+            var batch = reader.getCurrentBatch();
+            assertEquals(1, batch.getRowCount());
+            BigIntVector a = (BigIntVector) batch.getVector("a");
+            BigIntVector b = (BigIntVector) batch.getVector("b");
+            assertEquals(1L, a.get(0));
+            assertEquals(2L, b.get(0));
+            assertFalse(reader.next());
         }
     }
 }

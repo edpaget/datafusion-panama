@@ -1,20 +1,24 @@
 package net.carcdr.datafusionpanama;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.arrow.vector.BigIntVector;
 import org.junit.jupiter.api.Test;
 
 class DataFusionDataFrameTest {
 
     @Test
-    void sqlReturnsNonNullDataFrame() throws DataFusionException {
+    void sqlReturnsDataFrameWithExpectedData() throws DataFusionException {
         try (DataFusionRuntime runtime = DataFusionRuntime.create();
                 DataFusionSession session = runtime.newSession();
-                DataFusionDataFrame df = session.sql("SELECT 1")) {
-            assertNotNull(df);
-            assertNotNull(df.nativePointer());
+                DataFusionDataFrame df = session.sql("SELECT 1 AS v");
+                RecordBatchReader reader = df.collect()) {
+            assertTrue(reader.next());
+            BigIntVector vec = (BigIntVector) reader.getCurrentBatch().getVector("v");
+            assertEquals(1L, vec.get(0));
         }
     }
 
@@ -50,9 +54,11 @@ class DataFusionDataFrameTest {
     void sqlWithSelectExpression() throws DataFusionException {
         try (DataFusionRuntime runtime = DataFusionRuntime.create();
                 DataFusionSession session = runtime.newSession();
-                DataFusionDataFrame df = session.sql("SELECT 1 + 1 AS result")) {
-            assertNotNull(df);
-            assertNotNull(df.nativePointer());
+                DataFusionDataFrame df = session.sql("SELECT 1 + 1 AS result");
+                RecordBatchReader reader = df.collect()) {
+            assertTrue(reader.next());
+            BigIntVector vec = (BigIntVector) reader.getCurrentBatch().getVector("result");
+            assertEquals(2L, vec.get(0));
         }
     }
 }

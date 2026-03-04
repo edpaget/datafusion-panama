@@ -41,6 +41,7 @@ cd rust && cargo test
 ## Development practices
 
 - **Test-Driven Development (TDD):** Write tests before implementation. Red-green-refactor: write a failing test that defines the desired behavior, implement the minimum code to make it pass, then refactor.
+- **Assert expected values, not just existence:** Tests should verify concrete expected results (e.g. `assertEquals(42L, vec.get(0))`) rather than only checking that objects are non-null. Prefer assertions on actual data, row counts, field names, and column values. Reserve `assertNotNull` for cases where the value is genuinely opaque (e.g. native pointers with no observable behavior to test).
 - **Loose coupling via interfaces:** Modules should depend on interfaces (Java interfaces or abstract types), not on concrete implementations. This applies across the Java layer boundaries — the idiomatic API layer, the raw Panama bindings, and the Arrow data consumption layer should be connected through contracts, not direct references to implementation classes.
 
 ## Architectural principles
