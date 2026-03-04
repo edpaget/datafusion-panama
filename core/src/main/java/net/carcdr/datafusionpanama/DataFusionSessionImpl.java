@@ -5,6 +5,7 @@ import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
+import java.nio.file.Path;
 
 /** Package-private implementation of {@link DataFusionSession}. */
 final class DataFusionSessionImpl implements DataFusionSession {
@@ -19,6 +20,15 @@ final class DataFusionSessionImpl implements DataFusionSession {
             NativeLibrary.downcallHandle(
                     "session_sql",
                     FunctionDescriptor.of(
+                            ValueLayout.ADDRESS,
+                            ValueLayout.ADDRESS,
+                            ValueLayout.ADDRESS,
+                            ValueLayout.ADDRESS));
+    private static final MethodHandle SESSION_REGISTER_CSV =
+            NativeLibrary.downcallHandle(
+                    "session_register_csv",
+                    FunctionDescriptor.of(
+                            ValueLayout.ADDRESS,
                             ValueLayout.ADDRESS,
                             ValueLayout.ADDRESS,
                             ValueLayout.ADDRESS,
@@ -53,6 +63,23 @@ final class DataFusionSessionImpl implements DataFusionSession {
                             SESSION_SQL.invokeExact(runtimePointer, nativePointer(), sqlSegment);
             MemorySegment dataframePtr = NativeLibrary.unwrapOrThrow(resultPtr);
             return new DataFusionDataFrameImpl(dataframePtr, runtimePointer);
+        } catch (DataFusionException e) {
+            throw e;
+        } catch (Throwable t) {
+            throw new AssertionError("unexpected FFI invocation error", t);
+        }
+    }
+
+    @Override
+    public void registerCsv(String tableName, Path path) throws DataFusionException {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment nameSegment = arena.allocateFrom(tableName);
+            MemorySegment pathSegment = arena.allocateFrom(path.toString());
+            MemorySegment resultPtr =
+                    (MemorySegment)
+                            SESSION_REGISTER_CSV.invokeExact(
+                                    runtimePointer, nativePointer(), nameSegment, pathSegment);
+            NativeLibrary.unwrapOrThrow(resultPtr);
         } catch (DataFusionException e) {
             throw e;
         } catch (Throwable t) {
