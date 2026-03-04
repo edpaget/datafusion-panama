@@ -34,6 +34,16 @@ final class DataFusionSessionImpl implements DataFusionSession {
                             ValueLayout.ADDRESS,
                             ValueLayout.ADDRESS));
 
+    private static final MethodHandle SESSION_REGISTER_PARQUET =
+            NativeLibrary.downcallHandle(
+                    "session_register_parquet",
+                    FunctionDescriptor.of(
+                            ValueLayout.ADDRESS,
+                            ValueLayout.ADDRESS,
+                            ValueLayout.ADDRESS,
+                            ValueLayout.ADDRESS,
+                            ValueLayout.ADDRESS));
+
     private final MemorySegment runtimePointer;
     private MemorySegment pointer;
 
@@ -78,6 +88,23 @@ final class DataFusionSessionImpl implements DataFusionSession {
             MemorySegment resultPtr =
                     (MemorySegment)
                             SESSION_REGISTER_CSV.invokeExact(
+                                    runtimePointer, nativePointer(), nameSegment, pathSegment);
+            NativeLibrary.unwrapOrThrow(resultPtr);
+        } catch (DataFusionException e) {
+            throw e;
+        } catch (Throwable t) {
+            throw new AssertionError("unexpected FFI invocation error", t);
+        }
+    }
+
+    @Override
+    public void registerParquet(String tableName, Path path) throws DataFusionException {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment nameSegment = arena.allocateFrom(tableName);
+            MemorySegment pathSegment = arena.allocateFrom(path.toString());
+            MemorySegment resultPtr =
+                    (MemorySegment)
+                            SESSION_REGISTER_PARQUET.invokeExact(
                                     runtimePointer, nativePointer(), nameSegment, pathSegment);
             NativeLibrary.unwrapOrThrow(resultPtr);
         } catch (DataFusionException e) {

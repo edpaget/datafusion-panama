@@ -25,6 +25,15 @@ public interface DataFusionSession extends AutoCloseable {
     void registerCsv(String tableName, Path path) throws DataFusionException;
 
     /**
+     * Registers a Parquet file as a named table in this session.
+     *
+     * @param tableName the name to register the table under
+     * @param path the path to the Parquet file
+     * @throws DataFusionException if registration fails
+     */
+    void registerParquet(String tableName, Path path) throws DataFusionException;
+
+    /**
      * Returns the native pointer for use by other FFI classes.
      *
      * @return the native memory segment holding the pointer
