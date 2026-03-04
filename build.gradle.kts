@@ -119,7 +119,11 @@ subprojects {
 
     tasks.withType<Test> {
         dependsOn(rootProject.tasks.named("copyNativeLib"))
-        jvmArgs("--enable-preview", "--enable-native-access=ALL-UNNAMED")
+        jvmArgs(
+            "--enable-preview",
+            "--enable-native-access=ALL-UNNAMED",
+            "--add-opens=java.base/java.nio=ALL-UNNAMED"
+        )
         systemProperty(
             "java.library.path",
             rootProject.layout.buildDirectory.dir("native").get().asFile.absolutePath

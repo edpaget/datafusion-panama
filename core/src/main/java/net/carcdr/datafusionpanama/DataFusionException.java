@@ -11,4 +11,14 @@ public class DataFusionException extends Exception {
     public DataFusionException(String message) {
         super(message);
     }
+
+    /**
+     * Creates a new exception with the given error message and cause.
+     *
+     * @param message the error message
+     * @param cause the underlying cause
+     */
+    public DataFusionException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

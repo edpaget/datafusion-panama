@@ -1,6 +1,7 @@
 package net.carcdr.datafusionpanama;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,6 +27,7 @@ class RecordBatchReaderTest {
                 DataFusionDataFrame df = session.sql("SELECT 1 AS a");
                 RecordBatchReader reader = df.collect()) {
             assertNotNull(reader.getSchema());
+            assertEquals(1, reader.getSchema().getFields().size());
         }
     }
 
@@ -48,6 +50,7 @@ class RecordBatchReaderTest {
                 RecordBatchReader reader = df.collect()) {
             assertTrue(reader.next());
             assertNotNull(reader.getCurrentBatch());
+            assertEquals(1, reader.getCurrentBatch().getRowCount());
         }
     }
 
@@ -69,6 +72,7 @@ class RecordBatchReaderTest {
                 DataFusionDataFrame df = session.sql("SELECT 1 AS a, 2 AS b");
                 RecordBatchReader reader = df.collect()) {
             assertNotNull(reader.getSchema());
+            assertEquals(2, reader.getSchema().getFields().size());
             int batchCount = 0;
             while (reader.next()) {
                 assertNotNull(reader.getCurrentBatch());

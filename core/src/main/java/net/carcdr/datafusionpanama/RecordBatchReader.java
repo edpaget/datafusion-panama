@@ -1,14 +1,15 @@
 package net.carcdr.datafusionpanama;
 
-import java.lang.foreign.MemorySegment;
+import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.types.pojo.Schema;
 
 /**
  * Iterates over Arrow record batches received from a DataFusion DataFrame via the Arrow C Data
  * Interface {@code ArrowArrayStream}.
  *
- * <p>The returned {@link MemorySegment} values for schema and batches point to raw {@code
- * ArrowSchema} and {@code ArrowArray} structs respectively. Higher-level typed access is provided
- * by a future layer.
+ * <p>Uses Arrow Java's C Data Interface support for zero-copy import of record batches. The
+ * returned {@link Schema} and {@link VectorSchemaRoot} provide typed column access via Arrow Java's
+ * {@code FieldVector} subclasses (e.g. {@code BigIntVector}, {@code VarCharVector}).
  */
 public interface RecordBatchReader extends AutoCloseable {
 
@@ -22,23 +23,21 @@ public interface RecordBatchReader extends AutoCloseable {
     boolean next() throws DataFusionException;
 
     /**
-     * Returns the schema of the stream as a raw {@code ArrowSchema} memory segment.
+     * Returns the schema of the stream.
      *
-     * <p>The segment is valid for the lifetime of this reader.
-     *
-     * @return a memory segment pointing to the {@code ArrowSchema} struct
+     * @return the Arrow schema describing the columns in the stream
      */
-    MemorySegment getSchema();
+    Schema getSchema();
 
     /**
-     * Returns the current record batch as a raw {@code ArrowArray} memory segment.
+     * Returns the current record batch as a {@link VectorSchemaRoot}.
      *
-     * <p>Only valid after {@link #next()} has returned {@code true}. The segment is valid until the
-     * next call to {@link #next()} or {@link #close()}.
+     * <p>Only valid after {@link #next()} has returned {@code true}. The returned root is valid
+     * until the next call to {@link #next()} or {@link #close()}.
      *
-     * @return a memory segment pointing to the {@code ArrowArray} struct
+     * @return the current record batch
      */
-    MemorySegment getCurrentBatch();
+    VectorSchemaRoot getCurrentBatch();
 
     @Override
     void close();
