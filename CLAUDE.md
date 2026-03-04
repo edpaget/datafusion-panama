@@ -68,6 +68,7 @@ See `IMPLEMENTATION.md` for full design rationale and API sketches. The rules be
 - **MethodHandle ownership:** Each impl class declares its own `static final MethodHandle` fields for the FFI functions it calls. `NativeLibrary` provides only shared infrastructure: library loading, `downcallHandle()`, and `unwrapOrThrow()`.
 - **Error handling split:** Rust-originated errors become `DataFusionException` (checked). FFI invocation failures (`Throwable` from `MethodHandle.invokeExact`) become `AssertionError` — these indicate a binding bug, not a user error.
 - **No external dependencies for core:** The Java side uses only Panama APIs and the JDK. Arrow Java interop is an optional future layer.
+- **Javadoc compliance:** All public API types and members must have complete Javadoc, including `@param`, `@return`, and `@throws` tags. The build enables `-Werror` on the Javadoc task, so any missing or malformed Javadoc fails the build. The `check` task and pre-commit hook both run Javadoc generation.
 
 ## Commit conventions
 
