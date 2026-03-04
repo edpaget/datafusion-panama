@@ -63,15 +63,16 @@ try (var runtime = DataFusionRuntime.create()) {
 }
 ```
 
-### Arrow Data Consumption: Layered Approach
+### Arrow Data Consumption
 
-The data plane uses the Arrow C Data Interface for zero-copy result transfer. On the Java side, consumption is split into two layers:
+The data plane uses the Arrow C Data Interface for zero-copy result transfer. On the Java side, `RecordBatchReader` uses Arrow Java's `arrow-c-data` module to import `ArrowArrayStream` structs populated by Rust. The flow:
 
-**Layer 1 (core, no Arrow Java dependency):** A pure Panama consumer of `ArrowArrayStream`. This layer implements the C Data Interface protocol entirely via Panama downcalls — reading the struct layout, calling `get_schema`/`get_next`/`release` function pointers, and exposing the raw Arrow buffers as `MemorySegment`-backed read-only accessors. These thin wrappers understand Arrow's columnar layout (validity bitmaps, offsets, data buffers) but are minimal — enough to read results without any external dependency.
+1. Java allocates an `ArrowArrayStream` via `ArrowArrayStream.allocateNew(allocator)`
+2. Rust's `dataframe_collect` populates the stream struct via Panama downcall
+3. `Data.importArrayStream(allocator, stream)` produces an `ArrowReader` — zero-copy via `ForeignAllocation`
+4. Users access typed columns via Arrow Java's `FieldVector` subclasses (`BigIntVector`, `Float8Vector`, `VarCharVector`, `BitVector`, etc.)
 
-**Layer 2 (optional, deferred):** An Arrow Java bridge module that translates the `MemorySegment`-backed buffers into Arrow Java `VectorSchemaRoot` / `FieldVector` objects for users who need interop with the broader Arrow Java ecosystem. The open question for this layer is whether it can be zero-copy (wrapping the same underlying memory) or requires a copy due to Arrow Java's `BufferAllocator` ownership model. This is deferred — it doesn't need to be answered until the core path works.
-
-This layering keeps phase 1 dependency-free on the Java side (only Panama APIs and JUnit) while leaving a clean seam for Arrow Java integration later.
+Each `RecordBatchReader` owns its own `RootAllocator`, closed when the reader closes. The low-level Panama struct layouts (`ArrowArrayStreamLayout`, `ArrowArrayLayout`, `ArrowSchemaLayout`) remain in the codebase for debugging and potential future lower-level access.
 
 ## Rust FFI Layer
 
@@ -330,7 +331,6 @@ This phase depends only on Phase 1 (core query path) — it wraps the existing s
 - Extensions: each declared as `optional = true` in `[dependencies]`, gated by its feature flag
 
 ### Java side
-- Core: no external dependencies (pure Panama APIs)
+- Core: Arrow Java (`arrow-vector`, `arrow-c-data`, `arrow-memory-unsafe`) for zero-copy C Data Interface import
 - Extension modules: no external Java dependencies — they only add Panama bindings for the feature-gated FFI symbols. The heavy lifting is in Rust.
-- Apache Arrow Java — optional bridge module, deferred to a later phase
 - JUnit 5 (test only, already present)
