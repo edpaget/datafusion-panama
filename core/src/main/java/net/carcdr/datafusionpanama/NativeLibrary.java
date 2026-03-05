@@ -58,17 +58,21 @@ final class NativeLibrary {
             boolean ok = (boolean) RESULT_IS_OK.invokeExact(resultPtr);
             if (ok) {
                 MemorySegment value = (MemorySegment) RESULT_UNWRAP.invokeExact(resultPtr);
-                RESULT_FREE.invokeExact(resultPtr);
                 return value;
             }
             MemorySegment msgPtr = (MemorySegment) RESULT_ERROR_MESSAGE.invokeExact(resultPtr);
             String message = msgPtr.reinterpret(Long.MAX_VALUE).getString(0);
-            RESULT_FREE.invokeExact(resultPtr);
             throw new DataFusionException(message);
         } catch (DataFusionException e) {
             throw e;
         } catch (Throwable t) {
             throw new AssertionError("unexpected FFI invocation error", t);
+        } finally {
+            try {
+                RESULT_FREE.invokeExact(resultPtr);
+            } catch (Throwable t) {
+                throw new AssertionError("failed to free DFResult", t);
+            }
         }
     }
 }

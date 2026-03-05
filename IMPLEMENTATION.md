@@ -275,7 +275,7 @@ Default (no property): builds core only, smallest binary. An `all-extensions` fe
 
 **Phase 2: DataFrame API.** Expose DataFusion's DataFrame operations (filter, select, aggregate, join) as Java methods on the DataFrame wrapper. Still synchronous.
 
-**Phase 3: Async + streaming.** Add `sqlAsync()` returning `CompletableFuture`, streaming result sets via `ArrowArrayStream` (batch-at-a-time rather than collecting all at once).
+**Phase 3: Async + streaming.** Add `sqlAsync()` returning `CompletableFuture`, streaming result sets via `ArrowArrayStream` (batch-at-a-time rather than collecting all at once). This phase must also make the Java wrapper classes thread-safe: the mutable `pointer` fields in `DataFusionRuntimeImpl`, `DataFusionSessionImpl`, and `DataFusionDataFrameImpl` are currently unsynchronized, so `close()` racing with `nativePointer()` from another thread could cause a use-after-free. Phase 1–2 are single-threaded and unaffected.
 
 **Phase 4: Minimal JDBC adapter.** A thin JDBC driver that wraps the DataFusion session, enabling any JDBC-compatible tool (DBeaver, DataGrip, BI tools, JDBC-based ORMs) to query DataFusion.
 
