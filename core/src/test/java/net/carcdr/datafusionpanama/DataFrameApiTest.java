@@ -364,6 +364,123 @@ class DataFrameApiTest {
         }
     }
 
+    // -- clone semantics --
+
+    @Test
+    void sourceDataFrameUnchangedAfterTransformation() throws DataFusionException {
+        try (DataFusionRuntime runtime = DataFusionRuntime.create();
+                DataFusionSession session = runtime.newSession();
+                DataFusionDataFrame df =
+                        session.sql("SELECT * FROM (VALUES (1), (2), (3)) AS t(id)");
+                DataFusionDataFrame filtered = df.filter("id > 1")) {
+            assertEquals(2L, filtered.count());
+            assertEquals(3L, df.count());
+        }
+    }
+
+    // -- empty result --
+
+    @Test
+    void emptyResultSet() throws DataFusionException {
+        try (DataFusionRuntime runtime = DataFusionRuntime.create();
+                DataFusionSession session = runtime.newSession();
+                DataFusionDataFrame df =
+                        session.sql("SELECT * FROM (VALUES (1), (2), (3)) AS t(id)");
+                DataFusionDataFrame filtered = df.filter("id > 100");
+                RecordBatchReader reader = filtered.collect()) {
+            long rows = 0;
+            while (reader.next()) {
+                rows += reader.getCurrentBatch().getRowCount();
+            }
+            assertEquals(0, rows);
+        }
+    }
+
+    // -- reuse --
+
+    @Test
+    void dataFrameReuseForMultipleOperations() throws DataFusionException {
+        try (DataFusionRuntime runtime = DataFusionRuntime.create();
+                DataFusionSession session = runtime.newSession();
+                DataFusionDataFrame df =
+                        session.sql("SELECT * FROM (VALUES (1), (2), (3)) AS t(id)");
+                DataFusionDataFrame a = df.filter("id > 1");
+                DataFusionDataFrame b = df.filter("id < 3")) {
+            assertEquals(2L, a.count());
+            assertEquals(2L, b.count());
+        }
+    }
+
+    // -- global aggregation --
+
+    @Test
+    void globalAggregationNoGroupBy() throws DataFusionException {
+        try (DataFusionRuntime runtime = DataFusionRuntime.create();
+                DataFusionSession session = runtime.newSession();
+                DataFusionDataFrame df =
+                        session.sql("SELECT * FROM (VALUES (10), (20), (30)) AS t(val)");
+                DataFusionDataFrame agg =
+                        df.aggregate(new String[] {}, new String[] {"SUM(val)", "COUNT(val)"});
+                RecordBatchReader reader = agg.collect()) {
+            assertTrue(reader.next());
+            assertEquals(1, reader.getCurrentBatch().getRowCount());
+            // DataFusion names aggregate columns like "sum(t.val)" / "count(t.val)"
+            BigIntVector sumVec = (BigIntVector) reader.getCurrentBatch().getVector(0);
+            BigIntVector countVec = (BigIntVector) reader.getCurrentBatch().getVector(1);
+            assertEquals(60L, sumVec.get(0));
+            assertEquals(3L, countVec.get(0));
+        }
+    }
+
+    // -- multi-key sort --
+
+    @Test
+    void multipleSortKeysWithMixedDirection() throws DataFusionException {
+        try (DataFusionRuntime runtime = DataFusionRuntime.create();
+                DataFusionSession session = runtime.newSession();
+                DataFusionDataFrame df =
+                        session.sql(
+                                "SELECT * FROM (VALUES ('a', 2), ('a', 1),"
+                                        + " ('b', 1)) AS t(grp, val)");
+                DataFusionDataFrame sorted = df.sort("grp ASC", "val DESC");
+                RecordBatchReader reader = sorted.collect()) {
+            assertTrue(reader.next());
+            VarCharVector grpVec = (VarCharVector) reader.getCurrentBatch().getVector("grp");
+            BigIntVector valVec = (BigIntVector) reader.getCurrentBatch().getVector("val");
+            assertEquals("a", grpVec.getObject(0).toString());
+            assertEquals(2L, valVec.get(0));
+            assertEquals("a", grpVec.getObject(1).toString());
+            assertEquals(1L, valVec.get(1));
+            assertEquals("b", grpVec.getObject(2).toString());
+            assertEquals(1L, valVec.get(2));
+        }
+    }
+
+    // -- closed DataFrame --
+
+    @Test
+    void operationOnClosedDataFrameThrows() throws DataFusionException {
+        try (DataFusionRuntime runtime = DataFusionRuntime.create();
+                DataFusionSession session = runtime.newSession()) {
+            DataFusionDataFrame df = session.sql("SELECT 1 AS a");
+            df.close();
+            AssertionError err = assertThrows(AssertionError.class, () -> df.filter("true"));
+            assertTrue(err.getCause() instanceof IllegalStateException);
+        }
+    }
+
+    // -- count edge case --
+
+    @Test
+    void countOnEmptyDataFrame() throws DataFusionException {
+        try (DataFusionRuntime runtime = DataFusionRuntime.create();
+                DataFusionSession session = runtime.newSession();
+                DataFusionDataFrame df = session.sql("SELECT * FROM (VALUES (1)) AS t(id)");
+                DataFusionDataFrame empty = df.filter("id > 100")) {
+            assertEquals(0L, empty.count());
+        }
+    }
+
     // -- chaining --
 
     @Test
