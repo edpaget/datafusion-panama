@@ -137,6 +137,31 @@ subprojects {
             html.required.set(true)
             xml.required.set(true)
         }
+        classDirectories.setFrom(
+            classDirectories.files.map {
+                fileTree(it) { exclude("**/Main.class") }
+            }
+        )
+    }
+
+    tasks.withType<JacocoCoverageVerification> {
+        dependsOn(tasks.named("jacocoTestReport"))
+        classDirectories.setFrom(
+            classDirectories.files.map {
+                fileTree(it) { exclude("**/Main.class") }
+            }
+        )
+        violationRules {
+            rule {
+                limit {
+                    minimum = BigDecimal("0.70")
+                }
+            }
+        }
+    }
+
+    tasks.named("check") {
+        dependsOn(tasks.withType<JacocoCoverageVerification>())
     }
 
     configure<PublishingExtension> {
