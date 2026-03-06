@@ -2,7 +2,14 @@ package net.carcdr.datafusionpanama;
 
 import java.lang.foreign.MemorySegment;
 
-/** Manages the lifecycle of a DataFusion DataFrame. */
+/**
+ * Manages the lifecycle of a DataFusion DataFrame.
+ *
+ * <p>Each DataFrame holds a native pointer to a Rust-allocated object. When chaining operations
+ * (e.g. {@code df.filter(...).sort(...).limit(...)}), intermediate DataFrames that are not
+ * explicitly closed will be cleaned up automatically by the garbage collector. However, explicit
+ * {@link #close()} or try-with-resources is recommended for deterministic resource release.
+ */
 public interface DataFusionDataFrame extends AutoCloseable {
 
     /**

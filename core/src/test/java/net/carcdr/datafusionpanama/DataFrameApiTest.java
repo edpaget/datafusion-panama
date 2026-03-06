@@ -481,6 +481,28 @@ class DataFrameApiTest {
         }
     }
 
+    // -- close idempotency --
+
+    @Test
+    void doubleCloseIsIdempotent() throws DataFusionException {
+        try (DataFusionRuntime runtime = DataFusionRuntime.create();
+                DataFusionSession session = runtime.newSession()) {
+            DataFusionDataFrame df = session.sql("SELECT 1 AS a");
+            df.close();
+            df.close(); // second close must not throw
+        }
+    }
+
+    @Test
+    void closeAfterGcHintDoesNotThrow() throws DataFusionException {
+        try (DataFusionRuntime runtime = DataFusionRuntime.create();
+                DataFusionSession session = runtime.newSession()) {
+            DataFusionDataFrame df = session.sql("SELECT 1 AS a");
+            System.gc();
+            df.close(); // must not throw even if GC ran
+        }
+    }
+
     // -- chaining --
 
     @Test

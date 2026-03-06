@@ -5,6 +5,7 @@ import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
+import java.lang.ref.Cleaner;
 
 /** Package-private implementation of {@link DataFusionDataFrame}. */
 final class DataFusionDataFrameImpl implements DataFusionDataFrame {
@@ -183,11 +184,46 @@ final class DataFusionDataFrameImpl implements DataFusionDataFrame {
                             ValueLayout.ADDRESS));
 
     private final MemorySegment runtimePointer;
-    private MemorySegment pointer;
+    private final CleaningAction cleaningAction;
+    private final Cleaner.Cleanable cleanable;
 
     DataFusionDataFrameImpl(MemorySegment pointer, MemorySegment runtimePointer) {
-        this.pointer = pointer;
         this.runtimePointer = runtimePointer;
+        this.cleaningAction = new CleaningAction(pointer);
+        this.cleanable = NativeCleaner.CLEANER.register(this, cleaningAction);
+    }
+
+    /**
+     * Captures the native pointer for cleanup. Must NOT reference the enclosing {@code
+     * DataFusionDataFrameImpl} instance — doing so would prevent GC.
+     */
+    static final class CleaningAction implements Runnable {
+        private volatile MemorySegment pointer;
+
+        CleaningAction(MemorySegment pointer) {
+            this.pointer = pointer;
+        }
+
+        MemorySegment pointer() {
+            MemorySegment p = pointer;
+            if (p == null || p.equals(MemorySegment.NULL)) {
+                throw new IllegalStateException("DataFrame is closed");
+            }
+            return p;
+        }
+
+        @Override
+        public void run() {
+            MemorySegment p = pointer;
+            if (p != null && !p.equals(MemorySegment.NULL)) {
+                try {
+                    DATAFRAME_FREE.invokeExact(p);
+                } catch (Throwable t) {
+                    throw new AssertionError("failed to free DataFrame", t);
+                }
+                pointer = MemorySegment.NULL;
+            }
+        }
     }
 
     @Override
@@ -504,22 +540,12 @@ final class DataFusionDataFrameImpl implements DataFusionDataFrame {
 
     @Override
     public MemorySegment nativePointer() {
-        if (pointer == null || pointer.equals(MemorySegment.NULL)) {
-            throw new IllegalStateException("DataFrame is closed");
-        }
-        return pointer;
+        return cleaningAction.pointer();
     }
 
     @Override
     public void close() {
-        if (pointer != null && !pointer.equals(MemorySegment.NULL)) {
-            try {
-                DATAFRAME_FREE.invokeExact(pointer);
-            } catch (Throwable t) {
-                throw new AssertionError("failed to free DataFrame", t);
-            }
-            pointer = MemorySegment.NULL;
-        }
+        cleanable.clean();
     }
 
     /**
