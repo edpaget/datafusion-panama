@@ -16,3 +16,10 @@ build/
 
 # Local roadmaps (working docs, not committed)
 roadmaps/
+
+# Research notes
+.research/
+
+# Claude Code
+.claude/settings.local.json
+.claude/*.local.json
